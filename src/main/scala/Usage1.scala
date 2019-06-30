@@ -1,8 +1,10 @@
 import com.typesafe.config.ConfigFactory
-object Usage extends App {
+object Usage1 extends App {
 
   val conf      = ConfigFactory.load()
   val datasetId = conf.getString("bqcodegen.dataset.id")
+  val outputDir = conf.getString("bqcodegen.output.dir")
+  val outputPkg = conf.getString("bqcodegen.output.pkg")
 
   val sampleTable1Sql = s"create table `$datasetId.sample_table_1`(foo string, bar int64)"
 
@@ -32,6 +34,6 @@ object Usage extends App {
 //  CreateTable.createTableUsingJson(datasetId, "sample_table_2", sampleTable2Json)
 
   // 3. create case class
-  BigQueryCaseClassGenerator.run(datasetId)
+  BigQueryCaseClassGenerator.run(datasetId, outputDir, outputPkg)
 
 }

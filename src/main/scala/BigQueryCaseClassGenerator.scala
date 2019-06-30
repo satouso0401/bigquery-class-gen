@@ -1,3 +1,5 @@
+import java.io.{BufferedWriter, File, FileWriter}
+
 import com.google.cloud.bigquery._
 
 import scala.jdk.CollectionConverters._
@@ -12,7 +14,7 @@ object BigQueryCaseClassGenerator {
                         mappingPair: String,
                         mappingDef: Seq[String])
 
-  def run(datasetId: String) = {
+  def run(datasetId: String, outputDir: String, outputPkg: String) = {
 
     // table list
     val tableIdList =
@@ -27,8 +29,19 @@ object BigQueryCaseClassGenerator {
       generateClass(tableName, fieldList)
     }
 
-    // TODO write file
-    println(codeList)
+
+    // wrap with package and object
+    val objectName = datasetId.UCamel
+    val packageContainerCode =
+      s"""package $outputPkg
+         |
+         |object $objectName {
+         |${codeList.mkString("\n")}
+         |}
+         |
+         |""".stripMargin
+
+    writeFile(outputDir, outputPkg, objectName, packageContainerCode)
 
   }
 
@@ -67,7 +80,7 @@ object BigQueryCaseClassGenerator {
     val nodeMappingDef = list.collect { case Right(x) => x.mappingDef }.flatten
     val mappingDef     = "\n" + (rootMappingDef +: nodeMappingDef).mkString("\n") + "\n"
 
-    (caseClass, mappingDef)
+    caseClass + "\n" + mappingDef
   }
 
   def generateField(field: Field): Either[FieldInfo, StructInfo] = {
@@ -133,6 +146,20 @@ object BigQueryCaseClassGenerator {
 
       Left(FieldInfo(thisField, thisMapPair))
     }
+  }
+
+  def writeFile(outputDir: String, outputPkg: String, objectName: String, code: String) = {
+    val folder = outputDir + "/" + outputPkg.replace(".", "/") + "/"
+    new File(folder).mkdirs()
+    val file = new File( folder + objectName + ".scala" )
+    if (!file.exists()) {
+      file.createNewFile()
+    }
+    val fw = new FileWriter(file.getAbsoluteFile)
+    val bw = new BufferedWriter(fw)
+    bw.write(code)
+    bw.close()
+
   }
 
   def camelCase(str: String) = {
