@@ -14,6 +14,17 @@ object BigQueryCaseClassGenerator {
                         mappingPair: String,
                         mappingDef: Seq[String])
 
+  // TODO パッケージ名の整理
+  // TODO 名前が同じSTRUCTの case class が衝突しないようにテーブル毎に出力するファイルを変える
+  // TODO 同じ構造のSTRUCTの場合を考慮して case class の重複削除の処理を入れる
+  // TODO nullableなフィールドに対応する
+  // TODO 繰り返しフィールドに対応する
+  // TODO 日付型などの変換はおそらく今のままだと動かない
+  // TODO generateFieldが大きいので分割する
+  // TODO テストのやり方を考える コードの生成部分だけテストする？ テスト用のリポジトリを作る？ マルチプロジェクトにする？
+  // TODO [やれたらやる] BQからの読み込み時のデータマッピング処理の追加
+
+
   def run(datasetId: String, outputDir: String, outputPkg: String) = {
 
     // table list
@@ -29,16 +40,17 @@ object BigQueryCaseClassGenerator {
       generateClass(tableName, fieldList)
     }
 
-
     // wrap with package and object
     val objectName = datasetId.UCamel
     val packageContainerCode =
-      s"""package $outputPkg
+      s"""
+         |package $outputPkg
+         |import java.util
+         |import scala.jdk.CollectionConverters._
          |
          |object $objectName {
          |${codeList.mkString("\n")}
          |}
-         |
          |""".stripMargin
 
     writeFile(outputDir, outputPkg, objectName, packageContainerCode)
@@ -72,10 +84,10 @@ object BigQueryCaseClassGenerator {
       s"""
          |object $tableName{
          |  implicit class ToBqRow(val x: $tableName) {
-         |    def toBqRow: Map[String, Any] = { Map($rootMappingPair) }
+         |    def toBqRow: util.Map[String, Any] = { Map($rootMappingPair) }.asJava
          |  }
          |}
-       """.stripMargin
+         |""".stripMargin
 
     val nodeMappingDef = list.collect { case Right(x) => x.mappingDef }.flatten
     val mappingDef     = "\n" + (rootMappingDef +: nodeMappingDef).mkString("\n") + "\n"
@@ -115,7 +127,7 @@ object BigQueryCaseClassGenerator {
           case Right(x) => x.mappingPair
         }
         .mkString(", ")
-      val thisMapDef = s"def $thisMapDefName(x: $thisFieldType) = { Map($childMapPair)}"
+      val thisMapDef = s"def $thisMapDefName(x: $thisFieldType) = { Map($childMapPair)}.asJava"
 
       // child mapping function list
       val childMapDefList = fieldList.collect { case Right(x) => x }.flatMap(_.mappingDef)
@@ -151,7 +163,7 @@ object BigQueryCaseClassGenerator {
   def writeFile(outputDir: String, outputPkg: String, objectName: String, code: String) = {
     val folder = outputDir + "/" + outputPkg.replace(".", "/") + "/"
     new File(folder).mkdirs()
-    val file = new File( folder + objectName + ".scala" )
+    val file = new File(folder + objectName + ".scala")
     if (!file.exists()) {
       file.createNewFile()
     }

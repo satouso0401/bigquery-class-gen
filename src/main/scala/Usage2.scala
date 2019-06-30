@@ -15,7 +15,7 @@ object Usage2 extends App {
 //  val rowContent = SampleTable1("test", 1).toBqRow.asJava
 
   val tableId    = TableId.of(datasetId, "sample_table_2")
-  val rowContent = SampleTable2(1, 2, StructField(3, 4), NestedStruct1(5, NestedStruct2(6))).toBqRow.asJava
+  val rowContent = SampleTable2(1, 2, StructField(3, 4), NestedStruct1(5, NestedStruct2(6))).toBqRow
 
   val response: Try[InsertAllResponse] = Try {
     bigQuery.insertAll(
