@@ -26,6 +26,22 @@ object Usage1 extends App {
         ]
     """
 
+  val sampleTable3Json =
+    s"""
+        [
+          {"name": "int64",     "mode": "REQUIRED", "type": "INT64"},
+          {"name": "numeric",   "mode": "REQUIRED", "type": "NUMERIC"},
+          {"name": "float64",   "mode": "REQUIRED", "type": "FLOAT64"},
+          {"name": "bool",      "mode": "REQUIRED", "type": "BOOL"},
+          {"name": "string",    "mode": "REQUIRED", "type": "STRING"},
+          {"name": "bytes",     "mode": "REQUIRED", "type": "BYTES"},
+          {"name": "date",      "mode": "REQUIRED", "type": "DATE"},
+          {"name": "datetime",  "mode": "REQUIRED", "type": "DATETIME"},
+          {"name": "time",      "mode": "REQUIRED", "type": "TIME"},
+          {"name": "timestamp", "mode": "REQUIRED", "type": "TIMESTAMP"}
+        ]
+    """
+
   // 1. set credential
   // export GOOGLE_APPLICATION_CREDENTIALS="credential.json"
 
