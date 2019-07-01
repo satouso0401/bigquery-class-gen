@@ -8,70 +8,66 @@ object BigQueryCaseClassGenerator {
 
   val bigquery = BigQueryOptions.getDefaultInstance.getService
 
-  case class FieldInfo(classField: String, mappingPair: String)
-  case class StructInfo(classField: String,
-                        classDef: Seq[String],
+  case class FieldInfo(field: String, mappingPair: String)
+  case class StructInfo(field: String,
+                        structDef: Seq[String],
                         mappingPair: String,
                         mappingDef: Seq[String])
 
   // TODO パッケージ名の整理
-  // TODO 名前が同じSTRUCTの case class が衝突しないようにテーブル毎に出力するファイルを変える
-  // TODO 同じ構造のSTRUCTの場合を考慮して case class の重複削除の処理を入れる
   // TODO nullableなフィールドに対応する
   // TODO 繰り返しフィールドに対応する
   // TODO 日付型などの変換はおそらく今のままだと動かない
-  // TODO generateFieldが大きいので分割する
   // TODO テストのやり方を考える コードの生成部分だけテストする？ テスト用のリポジトリを作る？ マルチプロジェクトにする？
+  // TODO マッピング用の関数はScalaのMapではなくJavaのMapに直接変換した方がパフォーマンス上有利かもしれない
   // TODO [やれたらやる] BQからの読み込み時のデータマッピング処理の追加
 
-
-  def run(datasetId: String, outputDir: String, outputPkg: String) = {
+  def run(datasetId: String, outputDir: String, outputPkg: String): Unit = {
 
     // table list
     val tableIdList =
       bigquery.listTables(datasetId).iterateAll().asScala.toList.map(_.getTableId.getTable)
 
-    // generate code
-    val codeList = for (tableId <- tableIdList) yield {
+    for (tableId <- tableIdList) yield {
+
+      // generate code
       val tableName = tableId.UCamel
       val table     = bigquery.getTable(datasetId, tableId)
       val schema    = table.getDefinition[TableDefinition]().getSchema
       val fieldList = schema.getFields.iterator().asScala.toList
-      generateClass(tableName, fieldList)
+
+      val codeBody = generateClass(tableName, fieldList)
+
+      // write file
+      val objectName = tableName
+      val packageContainerCode =
+        s"""package $outputPkg
+           |import java.util
+           |import scala.jdk.CollectionConverters._
+           |
+           |$codeBody
+           |""".stripMargin
+
+      writeFile(outputDir, outputPkg, objectName, packageContainerCode)
     }
-
-    // wrap with package and object
-    val objectName = datasetId.UCamel
-    val packageContainerCode =
-      s"""
-         |package $outputPkg
-         |import java.util
-         |import scala.jdk.CollectionConverters._
-         |
-         |object $objectName {
-         |${codeList.mkString("\n")}
-         |}
-         |""".stripMargin
-
-    writeFile(outputDir, outputPkg, objectName, packageContainerCode)
 
   }
 
-  def generateClass(tableName: String, fields: Seq[Field]) = {
+  private def generateClass(tableName: String, bqFields: Seq[Field]): String = {
 
-    val list = for (f: Field <- fields) yield {
+    val list = for (f: Field <- bqFields) yield {
       generateField(f)
     }
 
     val rootClassField = list
       .map {
-        case Left(x)  => x.classField
-        case Right(x) => x.classField
+        case Left(x)  => x.field
+        case Right(x) => x.field
       }
       .mkString(", ")
     val rootClass = s"case class $tableName($rootClassField)"
-    val nodeClass = list.collect { case Right(x) => x.classDef }.flatten
-    val caseClass = "\n" + (rootClass +: nodeClass).mkString("\n") + "\n"
+    val nodeClass = list.collect { case Right(x) => x.structDef }.flatten
+    val caseClass = (rootClass +: nodeClass).distinct.mkString("\n")
 
     val rootMappingPair = list
       .map {
@@ -80,87 +76,100 @@ object BigQueryCaseClassGenerator {
       }
       .mkString(", ")
 
-    val rootMappingDef =
+    val nodeMappingDef = list.collect { case Right(x) => x.mappingDef }.flatten
+    val mappingDef =
       s"""
          |object $tableName{
          |  implicit class ToBqRow(val x: $tableName) {
          |    def toBqRow: util.Map[String, Any] = { Map($rootMappingPair) }.asJava
          |  }
+         |  ${nodeMappingDef.distinct.mkString("\n  ")}
          |}
          |""".stripMargin
-
-    val nodeMappingDef = list.collect { case Right(x) => x.mappingDef }.flatten
-    val mappingDef     = "\n" + (rootMappingDef +: nodeMappingDef).mkString("\n") + "\n"
 
     caseClass + "\n" + mappingDef
   }
 
-  def generateField(field: Field): Either[FieldInfo, StructInfo] = {
-    if (field.getType.getStandardType == StandardSQLTypeName.STRUCT) {
-      val fieldList = field.getSubFields.iterator().asScala.toSeq.map(x => generateField(x))
+  def generateField(bqField: Field): Either[FieldInfo, StructInfo] = {
+    if (bqField.getType.getStandardType == StandardSQLTypeName.STRUCT) {
+      val childFieldList = bqField.getSubFields.iterator().asScala.toSeq.map(x => generateField(x))
 
-      // case class field
-      val thisFieldName = field.getName.lCamel
-      val thisFieldType = field.getName.UCamel
-      val thisField     = s"$thisFieldName: $thisFieldType"
+      val fieldName = bqField.getName.lCamel
+      val fieldType = bqField.getName.UCamel
 
-      // case class define
-      val childFields = fieldList
-        .map {
-          case Left(x)  => x.classField
-          case Right(x) => x.classField
-        }
-        .mkString(", ")
-      val thisClass = s"case class $thisFieldType($childFields)"
+      // generate case class code
+      val thisField      = structField(fieldName, fieldType)
+      val thisClass      = structClass(fieldType, childFieldList)
+      val childClassList = childFieldList.collect { case Right(x) => x }.flatMap(_.structDef)
 
-      // child case class define list
-      val childClassList = fieldList.collect { case Right(x) => x }.flatMap(_.classDef)
-
-      // column mapping
-      val thisMapDefName = field.getName.lCamel
-      val thisMapPair    = s""""${field.getName}" -> $thisMapDefName(x.$thisFieldName)"""
-
-      // column mapping function
-      val childMapPair = fieldList
-        .map {
-          case Left(x)  => x.mappingPair
-          case Right(x) => x.mappingPair
-        }
-        .mkString(", ")
-      val thisMapDef = s"def $thisMapDefName(x: $thisFieldType) = { Map($childMapPair)}.asJava"
-
-      // child mapping function list
-      val childMapDefList = fieldList.collect { case Right(x) => x }.flatMap(_.mappingDef)
+      // generate mapping def
+      val bqFieldName     = bqField.getName
+      val mappingDefName  = bqField.getName.lCamel
+      val thisMappingPair = structMappingPair(bqFieldName, mappingDefName, fieldName)
+      val thisMappingDef  = structMappingDef(mappingDefName, fieldType, childFieldList)
+      val childMapDefList = childFieldList.collect { case Right(x) => x }.flatMap(_.mappingDef)
 
       Right(
-        StructInfo(thisField,
-                   childClassList :+ thisClass,
-                   thisMapPair,
-                   childMapDefList :+ thisMapDef))
+        StructInfo(
+          thisField,
+          childClassList :+ thisClass,
+          thisMappingPair,
+          childMapDefList :+ thisMappingDef
+        )
+      )
 
     } else {
-
       import com.google.cloud.bigquery.StandardSQLTypeName._
 
       // case class field
-      val thisFieldName = field.getName.lCamel
-      val thisFieldType = field.getType.getStandardType match {
+      val fieldName = bqField.getName.lCamel
+      val fieldType = bqField.getType.getStandardType match {
         case STRING    => "String"
         case INT64     => "Long"
         case FLOAT64   => "Double"
         case TIMESTAMP => "ZonedDateTime"
         case x         => throw new UnsupportedOperationException(s"$x field not supported")
       }
-      val thisField = s"$thisFieldName: $thisFieldType"
+      val thisField = s"$fieldName: $fieldType"
 
       // column mapping
-      val thisMapPair = s""""${field.getName}" -> x.$thisFieldName"""
+      val thisMapPair = s""""${bqField.getName}" -> x.$fieldName"""
 
       Left(FieldInfo(thisField, thisMapPair))
     }
   }
 
-  def writeFile(outputDir: String, outputPkg: String, objectName: String, code: String) = {
+  private def structField(fieldName: String, fieldType: String) = s"$fieldName: $fieldType"
+
+  private def structClass(fieldType: String, childFieldList: Seq[Either[FieldInfo, StructInfo]]) = {
+    val childFields = childFieldList
+      .map {
+        case Left(x)  => x.field
+        case Right(x) => x.field
+      }
+      .mkString(", ")
+    s"case class $fieldType($childFields)"
+  }
+
+  private def structMappingPair(bqFieldName: String, mappingDefName: String, fieldName: String) =
+    s""""$bqFieldName" -> $mappingDefName(x.$fieldName)"""
+
+  private def structMappingDef(mappingDefName: String,
+                               fieldType: String,
+                               childFieldList: Seq[Either[FieldInfo, StructInfo]]) = {
+    val childMappingPair = childFieldList
+      .map {
+        case Left(x)  => x.mappingPair
+        case Right(x) => x.mappingPair
+      }
+      .mkString(", ")
+    s"def $mappingDefName(x: $fieldType) = { Map($childMappingPair)}.asJava"
+  }
+
+  private def writeFile(outputDir: String,
+                        outputPkg: String,
+                        objectName: String,
+                        code: String): Unit = {
     val folder = outputDir + "/" + outputPkg.replace(".", "/") + "/"
     new File(folder).mkdirs()
     val file = new File(folder + objectName + ".scala")
@@ -174,7 +183,7 @@ object BigQueryCaseClassGenerator {
 
   }
 
-  def camelCase(str: String) = {
+  private def camelCase(str: String) = {
     str.toLowerCase.split("_").map(_.capitalize).mkString("")
   }
 

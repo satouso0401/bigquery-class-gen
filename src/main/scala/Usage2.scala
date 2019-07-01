@@ -1,6 +1,6 @@
 import com.google.cloud.bigquery.{BigQueryOptions, InsertAllRequest, InsertAllResponse, TableId}
 import com.typesafe.config.ConfigFactory
-import output.bq.TestDataset._
+import output.bq.testdataset.{NestedStruct1, NestedStruct2, SampleTable2, StructField}
 
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
