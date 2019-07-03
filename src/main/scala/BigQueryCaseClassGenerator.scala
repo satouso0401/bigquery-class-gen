@@ -17,7 +17,6 @@ object BigQueryCaseClassGenerator {
   // TODO パッケージ名の整理
   // TODO nullableなフィールドに対応する
   // TODO 繰り返しフィールドに対応する
-  // TODO 日付型などの変換はおそらく今のままだと動かない
   // TODO テストのやり方を考える コードの生成部分だけテストする？ テスト用のリポジトリを作る？ マルチプロジェクトにする？
   // TODO マッピング用の関数はScalaのMapではなくJavaのMapに直接変換した方がパフォーマンス上有利かもしれない
   // TODO [やれたらやる] BQからの読み込み時のデータマッピング処理の追加
@@ -42,7 +41,10 @@ object BigQueryCaseClassGenerator {
       val objectName = tableName
       val packageContainerCode =
         s"""package $outputPkg
+           |import java.time.format.DateTimeFormatter
+           |import java.time.{LocalDate, LocalDateTime, LocalTime, ZonedDateTime}
            |import java.util
+           |import java.util.Base64
            |import scala.jdk.CollectionConverters._
            |
            |$codeBody
@@ -124,16 +126,33 @@ object BigQueryCaseClassGenerator {
       // case class field
       val fieldName = bqField.getName.lCamel
       val fieldType = bqField.getType.getStandardType match {
-        case STRING    => "String"
         case INT64     => "Long"
+        case NUMERIC   => "Long"
         case FLOAT64   => "Double"
+        case BOOL      => "Boolean"
+        case STRING    => "String"
+        case BYTES     => "Array[Byte]"
+        case DATE      => "LocalDate"
+        case DATETIME  => "LocalDateTime"
+        case TIME      => "LocalTime"
         case TIMESTAMP => "ZonedDateTime"
         case x         => throw new UnsupportedOperationException(s"$x field not supported")
       }
       val thisField = s"$fieldName: $fieldType"
 
       // column mapping
-      val thisMapPair = s""""${bqField.getName}" -> x.$fieldName"""
+
+      val mappingFunc = bqField.getType.getStandardType match {
+        case INT64 | NUMERIC | FLOAT64 | BOOL | STRING => s"""x.$fieldName"""
+        case BYTES                                     => s"""Base64.getEncoder.encodeToString(x.$fieldName)"""
+        case DATE                                      => s"""x.$fieldName.format(DateTimeFormatter.ISO_LOCAL_DATE)"""
+        case DATETIME                                  => s"""x.$fieldName.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)"""
+        case TIME                                      => s"""x.$fieldName.format(DateTimeFormatter.ISO_LOCAL_TIME)"""
+        case TIMESTAMP                                 => s"""x.$fieldName.toInstant.getEpochSecond"""
+        case x                                         => throw new UnsupportedOperationException(s"$x field not supported")
+      }
+
+      val thisMapPair = s""""${bqField.getName}" -> $mappingFunc"""
 
       Left(FieldInfo(thisField, thisMapPair))
     }

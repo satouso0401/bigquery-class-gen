@@ -47,7 +47,7 @@ object Usage1 extends App {
 
   // 2. (Option) create table
 //  CreateTable.createTableUsingSql(sampleTable1Sql)
-//  CreateTable.createTableUsingJson(datasetId, "sample_table_2", sampleTable2Json)
+//  CreateTable.createTableUsingJson(datasetId, "sample_table_3", sampleTable3Json)
 
   // 3. create case class
   BigQueryCaseClassGenerator.run(datasetId, outputDir, outputPkg)

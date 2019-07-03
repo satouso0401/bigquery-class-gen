@@ -1,6 +1,8 @@
+import java.time.{LocalDate, LocalDateTime, ZonedDateTime}
+
 import com.google.cloud.bigquery.{BigQueryOptions, InsertAllRequest, InsertAllResponse, TableId}
 import com.typesafe.config.ConfigFactory
-import output.bq.testdataset.{NestedStruct1, NestedStruct2, SampleTable2, StructField}
+import output.bq.testdataset._
 
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
@@ -14,8 +16,11 @@ object Usage2 extends App {
 //  val tableId    = TableId.of(datasetId, "sample_table_1")
 //  val rowContent = SampleTable1("test", 1).toBqRow.asJava
 
-  val tableId    = TableId.of(datasetId, "sample_table_2")
-  val rowContent = SampleTable2(1, 2, StructField(3, 4), NestedStruct1(5, NestedStruct2(6))).toBqRow
+//  val tableId    = TableId.of(datasetId, "sample_table_2")
+//  val rowContent = SampleTable2(1, 2, StructField(3, 4), NestedStruct1(5, NestedStruct2(6))).toBqRow
+
+  val tableId    = TableId.of(datasetId, "sample_table_3")
+  val rowContent = SampleTable3(1, 1, 1.0, true, "str", Array(1.toByte), LocalDate.now(), LocalDateTime.now(), LocalDateTime.now().toLocalTime, ZonedDateTime.now()).toBqRow
 
   val response: Try[InsertAllResponse] = Try {
     bigQuery.insertAll(
