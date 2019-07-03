@@ -9,7 +9,7 @@ case class SampleTable3(int64: Long, numeric: Long, float64: Double, bool: Boole
 
 object SampleTable3{
   implicit class ToBqRow(val x: SampleTable3) {
-    def toBqRow: util.Map[String, Any] = { Map("int64" -> x.int64, "numeric" -> x.numeric, "float64" -> x.float64, "bool" -> x.bool, "string" -> x.string, "bytes" -> Base64.getEncoder.encodeToString(x.bytes), "date" -> x.date.format(DateTimeFormatter.ISO_LOCAL_DATE), "datetime" -> x.datetime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME), "time" -> x.time.format(DateTimeFormatter.ISO_LOCAL_TIME), "timestamp" -> x.timestamp.toInstant.getEpochSecond) }.asJava
+    def toBqRow = { Map("int64" -> x.int64, "numeric" -> x.numeric, "float64" -> x.float64, "bool" -> x.bool, "string" -> x.string, "bytes" -> Base64.getEncoder.encodeToString(x.bytes), "date" -> x.date.format(DateTimeFormatter.ISO_LOCAL_DATE), "datetime" -> x.datetime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME), "time" -> x.time.format(DateTimeFormatter.ISO_LOCAL_TIME), "timestamp" -> x.timestamp.toInstant.getEpochSecond) }.asJava
   }
   
 }
