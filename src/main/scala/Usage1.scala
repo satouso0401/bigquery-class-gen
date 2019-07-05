@@ -1,3 +1,4 @@
+import bq.classgen.BigQueryCaseClassGenerator
 import com.typesafe.config.ConfigFactory
 object Usage1 extends App {
 

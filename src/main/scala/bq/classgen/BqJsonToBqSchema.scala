@@ -1,8 +1,8 @@
+package bq.classgen
+
 import com.google.api.client.json.jackson2.JacksonFactory
 import com.google.api.services.bigquery.model.{TableFieldSchema, TableSchema}
 import com.google.cloud.bigquery.Schema
-
-// https://github.com/googleapis/google-cloud-java/issues/2753
 
 object BqJsonToBqSchema {
   private val parser = new JacksonFactory()

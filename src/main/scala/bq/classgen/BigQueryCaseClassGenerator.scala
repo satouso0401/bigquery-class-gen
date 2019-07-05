@@ -1,15 +1,16 @@
+package bq.classgen
+
 import java.io.{BufferedWriter, File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
 
 import com.google.cloud.bigquery.Field.Mode.{NULLABLE, REPEATED}
-import com.google.cloud.bigquery._
+import com.google.cloud.bigquery.{BigQueryOptions, Field, StandardSQLTypeName, TableDefinition}
 import org.scalafmt.interfaces.Scalafmt
-
 import scala.collection.JavaConverters._
 
 object BigQueryCaseClassGenerator {
 
-  val bigquery = BigQueryOptions.getDefaultInstance.getService
+  private val bigquery = BigQueryOptions.getDefaultInstance.getService
 
   case class FieldInfo(field: String, mappingPair: String)
   case class StructInfo(field: String,
@@ -17,7 +18,7 @@ object BigQueryCaseClassGenerator {
                         mappingPair: String,
                         mappingDef: Seq[String])
 
-  // TODO パッケージ名の整理
+  // TODO Structのcase classが衝突するかもしれないので対応する
   // TODO テストのやり方を考える コードの生成部分だけテストする？ テスト用のリポジトリを作る？ マルチプロジェクトにする？
   // TODO マッピング用の関数はScalaのMapではなくJavaのMapに直接変換した方がパフォーマンス上有利かもしれない
   // TODO マッピングする型の組みわせをカスタマイズできるようにする
@@ -150,8 +151,8 @@ object BigQueryCaseClassGenerator {
       )
 
     } else {
-      import com.google.cloud.bigquery.StandardSQLTypeName._
       import com.google.cloud.bigquery.Field.Mode._
+      import com.google.cloud.bigquery.StandardSQLTypeName._
 
       // case class field
       val fieldName = bqField.getName.lCamel
