@@ -4,7 +4,7 @@ import com.google.cloud.bigquery.{BigQueryOptions, InsertAllRequest, InsertAllRe
 import com.typesafe.config.ConfigFactory
 import output.bq.testdataset._
 
-import scala.jdk.CollectionConverters._
+import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 object Usage2 extends App {
 

@@ -1,9 +1,11 @@
 import java.io.{BufferedWriter, File, FileWriter}
+import java.nio.file.{Files, Path, Paths}
 
 import com.google.cloud.bigquery.Field.Mode.{NULLABLE, REPEATED}
 import com.google.cloud.bigquery._
+import org.scalafmt.interfaces.Scalafmt
 
-import scala.jdk.CollectionConverters._
+import scala.collection.JavaConverters._
 
 object BigQueryCaseClassGenerator {
 
@@ -18,6 +20,7 @@ object BigQueryCaseClassGenerator {
   // TODO パッケージ名の整理
   // TODO テストのやり方を考える コードの生成部分だけテストする？ テスト用のリポジトリを作る？ マルチプロジェクトにする？
   // TODO マッピング用の関数はScalaのMapではなくJavaのMapに直接変換した方がパフォーマンス上有利かもしれない
+  // TODO マッピングする型の組みわせをカスタマイズできるようにする
   // TODO [やれたらやる] BQからの読み込み時のデータマッピング処理の追加
 
   def run(datasetId: String, outputDir: String, outputPkg: String): Unit = {
@@ -42,14 +45,15 @@ object BigQueryCaseClassGenerator {
         s"""package $outputPkg
            |import java.time.format.DateTimeFormatter
            |import java.time.{LocalDate, LocalDateTime, LocalTime, ZonedDateTime}
-           |import java.util
            |import java.util.Base64
-           |import scala.jdk.CollectionConverters._
+           |import scala.collection.JavaConverters._
            |
            |$codeBody
            |""".stripMargin
 
-      writeFile(outputDir, outputPkg, objectName, packageContainerCode)
+      val formattedCode = format(packageContainerCode)
+
+      writeFile(outputDir, outputPkg, objectName, formattedCode)
     }
 
   }
@@ -230,6 +234,19 @@ object BigQueryCaseClassGenerator {
       }
       .mkString(", ")
     s"def $mappingDefName(x: $fieldType) = { Map($childMappingPair)}.asJava"
+  }
+
+  private def format(code: String) = {
+    val scalafmt     = Scalafmt.create(this.getClass.getClassLoader)
+    val config: Path = Paths.get(".scalafmt.conf")
+
+    if (Files.exists(config)) {
+      scalafmt
+        .withRespectVersion(false)
+        .withDefaultVersion("2.0.0")
+        .format(config, Paths.get("NotExistFile.scala"), code)
+    } else code
+
   }
 
   private def writeFile(outputDir: String,
