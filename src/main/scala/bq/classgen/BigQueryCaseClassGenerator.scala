@@ -18,7 +18,6 @@ object BigQueryCaseClassGenerator {
                         mappingPair: String,
                         mappingDef: Seq[String])
 
-  // TODO Structのcase classが衝突するかもしれないので対応する
   // TODO テストのやり方を考える コードの生成部分だけテストする？ テスト用のリポジトリを作る？ マルチプロジェクトにする？
   // TODO マッピング用の関数はScalaのMapではなくJavaのMapに直接変換した方がパフォーマンス上有利かもしれない
   // TODO マッピングする型の組みわせをカスタマイズできるようにする
@@ -93,7 +92,12 @@ object BigQueryCaseClassGenerator {
          |}
          |""".stripMargin
 
-    caseClass + "\n" + mappingDef
+    s"""
+       |object ${tableName}Table {
+       |$caseClass
+       |$mappingDef
+       |}
+     """.stripMargin
   }
 
   def generateField(bqField: Field): Either[FieldInfo, StructInfo] = {
@@ -256,7 +260,7 @@ object BigQueryCaseClassGenerator {
                         code: String): Unit = {
     val folder = outputDir + "/" + outputPkg.replace(".", "/") + "/"
     new File(folder).mkdirs()
-    val file = new File(folder + objectName + ".scala")
+    val file = new File(folder + objectName + "Table.scala")
     if (!file.exists()) {
       file.createNewFile()
     }

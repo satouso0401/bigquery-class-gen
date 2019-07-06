@@ -2,6 +2,7 @@ import java.time.{LocalDate, LocalDateTime, ZonedDateTime}
 
 import com.google.cloud.bigquery.{BigQueryOptions, InsertAllRequest, InsertAllResponse, TableId}
 import com.typesafe.config.ConfigFactory
+import output.bq.testdataset.SampleTable5Table.{SampleTable5, StructFieldRequired}
 import output.bq.testdataset._
 
 import scala.collection.JavaConverters._
