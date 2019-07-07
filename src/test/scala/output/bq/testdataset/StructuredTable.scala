@@ -1,11 +1,12 @@
 package output.bq.testdataset
+
 import java.time.format.DateTimeFormatter
 import java.time.{LocalDate, LocalDateTime, LocalTime, ZonedDateTime}
 import java.util.Base64
 import scala.collection.JavaConverters._
 
-object SampleTable2Table {
-  case class SampleTable2(
+object StructuredTable {
+  case class Structured(
       int1: Long,
       int2: Long,
       structField: StructField,
@@ -15,8 +16,8 @@ object SampleTable2Table {
   case class NestedStruct2(int4: Long)
   case class NestedStruct1(int3: Long, nestedStruct2: NestedStruct2)
 
-  object SampleTable2 {
-    implicit class ToBqRow(val x: SampleTable2) {
+  object Structured {
+    implicit class ToBqRow(val x: Structured) {
       def toBqRow = {
         Map(
           "int_1"           -> x.int1,

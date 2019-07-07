@@ -1,11 +1,12 @@
 package output.bq.testdataset
+
 import java.time.format.DateTimeFormatter
 import java.time.{LocalDate, LocalDateTime, LocalTime, ZonedDateTime}
 import java.util.Base64
 import scala.collection.JavaConverters._
 
-object SampleTable3Table {
-  case class SampleTable3(
+object VariousTypeTable {
+  case class VariousType(
       int64: Long,
       numeric: Long,
       float64: Double,
@@ -18,8 +19,8 @@ object SampleTable3Table {
       timestamp: ZonedDateTime
   )
 
-  object SampleTable3 {
-    implicit class ToBqRow(val x: SampleTable3) {
+  object VariousType {
+    implicit class ToBqRow(val x: VariousType) {
       def toBqRow = {
         Map(
           "int64"     -> x.int64,

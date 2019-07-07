@@ -1,11 +1,12 @@
 package output.bq.testdataset
+
 import java.time.format.DateTimeFormatter
 import java.time.{LocalDate, LocalDateTime, LocalTime, ZonedDateTime}
 import java.util.Base64
 import scala.collection.JavaConverters._
 
-object SampleTable5Table {
-  case class SampleTable5(
+object NullableAndRepeatedStructTable {
+  case class NullableAndRepeatedStruct(
       structFieldRequired: StructFieldRequired,
       structFieldNull: Option[StructFieldNull],
       structFieldList: Seq[StructFieldList]
@@ -14,8 +15,8 @@ object SampleTable5Table {
   case class StructFieldNull(null1: Option[Long], null2: Option[ZonedDateTime])
   case class StructFieldList(list1: Seq[Long], list2: Seq[ZonedDateTime])
 
-  object SampleTable5 {
-    implicit class ToBqRow(val x: SampleTable5) {
+  object NullableAndRepeatedStruct {
+    implicit class ToBqRow(val x: NullableAndRepeatedStruct) {
       def toBqRow = {
         Map(
           "struct_field_required" -> structFieldRequired(x.structFieldRequired),

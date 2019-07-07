@@ -1,11 +1,12 @@
 package output.bq.testdataset
+
 import java.time.format.DateTimeFormatter
 import java.time.{LocalDate, LocalDateTime, LocalTime, ZonedDateTime}
 import java.util.Base64
 import scala.collection.JavaConverters._
 
-object SampleTable4Table {
-  case class SampleTable4(
+object NullableAndRepeatedTable {
+  case class NullableAndRepeated(
       int64Null: Option[Long],
       numericNull: Option[Long],
       float64Null: Option[Double],
@@ -28,8 +29,8 @@ object SampleTable4Table {
       timestampList: Seq[ZonedDateTime]
   )
 
-  object SampleTable4 {
-    implicit class ToBqRow(val x: SampleTable4) {
+  object NullableAndRepeated {
+    implicit class ToBqRow(val x: NullableAndRepeated) {
       def toBqRow = {
         Map(
           "int64_null"   -> x.int64Null.getOrElse(null),

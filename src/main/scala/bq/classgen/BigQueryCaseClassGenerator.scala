@@ -43,6 +43,7 @@ object BigQueryCaseClassGenerator {
       val objectName = tableName
       val packageContainerCode =
         s"""package $outputPkg
+           |
            |import java.time.format.DateTimeFormatter
            |import java.time.{LocalDate, LocalDateTime, LocalTime, ZonedDateTime}
            |import java.util.Base64
@@ -241,15 +242,16 @@ object BigQueryCaseClassGenerator {
     s"def $mappingDefName(x: $fieldType) = { Map($childMappingPair)}.asJava"
   }
 
+  lazy val scalafmt = Scalafmt
+    .create(this.getClass.getClassLoader)
+    .withRespectVersion(false)
+    .withDefaultVersion("2.0.0")
+
   private def format(code: String) = {
-    val scalafmt     = Scalafmt.create(this.getClass.getClassLoader)
     val config: Path = Paths.get(".scalafmt.conf")
 
     if (Files.exists(config)) {
-      scalafmt
-        .withRespectVersion(false)
-        .withDefaultVersion("2.0.0")
-        .format(config, Paths.get("NotExistFile.scala"), code)
+      scalafmt.format(config, Paths.get("NotExistFile.scala"), code)
     } else code
 
   }

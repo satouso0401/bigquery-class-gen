@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 
 import org.scalatest._
+import bq.classgen.TestTables._
 
 import scala.collection.JavaConverters._
 
@@ -22,14 +23,41 @@ class BigQueryCaseClassGeneratorSpec
   val actualFileDir = "src/test/scala/output/bq/testdataset/"
 
   before {
+    TestTables.createTable(datasetId)
     BigQueryCaseClassGenerator.run(datasetId, outputDir, outputPkg)
   }
 
   "class generator" should {
     "create classes from simple tables" in {
-      val (expectLines, actualLines) = readLinesPair("SampleTable1Table.scala")
+
+      val (expectLines, actualLines) = readLinesPair("SimpleTable.scala")
       expectLines shouldBe actualLines
     }
+
+    "create classes from structured tables" in {
+
+      val (expectLines, actualLines) = readLinesPair(STRUCTURED_TABLE.classFileName)
+      expectLines shouldBe actualLines
+    }
+
+    "create classes from various type tables" in {
+
+      val (expectLines, actualLines) = readLinesPair(VARIOUS_TYPE_TABLE.classFileName)
+      expectLines shouldBe actualLines
+    }
+
+    "create classes from nullable and repeated tables" in {
+
+      val (expectLines, actualLines) = readLinesPair(NULLABLE_AND_REPEATED_TABLE.classFileName)
+      expectLines shouldBe actualLines
+    }
+
+    "create classes from nullable and repeated struct tables" in {
+
+      val (expectLines, actualLines) = readLinesPair(NULLABLE_AND_REPEATED_STRUCT_TABLE.classFileName)
+      expectLines shouldBe actualLines
+    }
+
   }
 
   def readLinesPair(fileName: String) = {
