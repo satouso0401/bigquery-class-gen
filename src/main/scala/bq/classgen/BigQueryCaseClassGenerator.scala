@@ -18,12 +18,12 @@ object BigQueryCaseClassGenerator {
                         mappingPair: String,
                         mappingDef: Seq[String])
 
-  // TODO テストのやり方を考える コードの生成部分だけテストする？ テスト用のリポジトリを作る？ マルチプロジェクトにする？
-  // TODO マッピング用の関数はScalaのMapではなくJavaのMapに直接変換した方がパフォーマンス上有利かもしれない
-  // TODO マッピングする型の組みわせをカスタマイズできるようにする
+  // TODO case classからBQへの登録用のオブジェクトへ変換する際に、ScalaのMapを使っているが、JavaのMapに直接変換した方が良いかもしれない
+  // TODO BQの型に対応するScalaの型をカスタマイズできるようにする
+  // TODO case classに使用していない型のインポートも入ってしまうのを削除する
   // TODO [やれたらやる] BQからの読み込み時のデータマッピング処理の追加
 
-  def run(datasetId: String, outputDir: String, outputPkg: String): Unit = {
+  def run(datasetId: String, outputDir: String, outputPkg: String, separatePackagesByTable: Boolean = false): Unit = {
 
     // table list
     val tableIdList =
@@ -41,8 +41,9 @@ object BigQueryCaseClassGenerator {
 
       // write file
       val objectName = tableName
+      val pkg = if (separatePackagesByTable) s"$outputPkg.${tableName.toLowerCase}" else outputPkg
       val packageContainerCode =
-        s"""package $outputPkg
+        s"""package $pkg
            |
            |import java.time.format.DateTimeFormatter
            |import java.time.{LocalDate, LocalDateTime, LocalTime, ZonedDateTime}
@@ -54,7 +55,7 @@ object BigQueryCaseClassGenerator {
 
       val formattedCode = format(packageContainerCode)
 
-      writeFile(outputDir, outputPkg, objectName, formattedCode)
+      writeFile(outputDir, pkg, objectName, formattedCode)
     }
 
   }
@@ -93,12 +94,7 @@ object BigQueryCaseClassGenerator {
          |}
          |""".stripMargin
 
-    s"""
-       |object ${tableName}Table {
-       |$caseClass
-       |$mappingDef
-       |}
-     """.stripMargin
+    caseClass + "\n" + mappingDef
   }
 
   def generateField(bqField: Field): Either[FieldInfo, StructInfo] = {
@@ -262,7 +258,7 @@ object BigQueryCaseClassGenerator {
                         code: String): Unit = {
     val folder = outputDir + "/" + outputPkg.replace(".", "/") + "/"
     new File(folder).mkdirs()
-    val file = new File(folder + objectName + "Table.scala")
+    val file = new File(folder + objectName + ".scala")
     if (!file.exists()) {
       file.createNewFile()
     }

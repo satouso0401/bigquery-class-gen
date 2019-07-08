@@ -4,7 +4,7 @@ import com.google.cloud.bigquery.{BigQueryOptions, Table}
 
 object TestTables {
 
-  case class TableInfo(tableId: String, classFileName: String, schemaJson: String)
+  case class TableInfo(tableId: String, schemaJson: String)
 
   def createTable(datasetId: String) = {
     val bigQuery = BigQueryOptions.getDefaultInstance.getService
@@ -44,8 +44,8 @@ object TestTables {
 
   val STRUCTURED_TABLE = TableInfo(
     "structured",
-    "StructuredTable.scala",
     """[
+      |  {"name": "id", "mode": "REQUIRED", "type": "STRING"},
       |  {"name": "int_1", "mode": "REQUIRED", "type": "INT64"},
       |  {"name": "int_2", "mode": "REQUIRED", "type": "INT64"},
       |  {"name": "struct_field", "mode": "REQUIRED", "type": "RECORD", "fields": [
@@ -64,7 +64,6 @@ object TestTables {
 
   val VARIOUS_TYPE_TABLE = TableInfo(
     "various_type",
-    "VariousTypeTable.scala",
     """[
       |  {"name": "int64",     "mode": "REQUIRED", "type": "INT64"},
       |  {"name": "numeric",   "mode": "REQUIRED", "type": "NUMERIC"},
@@ -82,7 +81,6 @@ object TestTables {
 
   val NULLABLE_AND_REPEATED_TABLE = TableInfo(
     "nullable_and_repeated",
-    "NullableAndRepeatedTable.scala",
     """[
       |  {"name": "int64_null",     "mode": "NULLABLE", "type": "INT64"},
       |  {"name": "numeric_null",   "mode": "NULLABLE", "type": "NUMERIC"},
@@ -110,8 +108,8 @@ object TestTables {
 
   val NULLABLE_AND_REPEATED_STRUCT_TABLE = TableInfo(
     "nullable_and_repeated_struct",
-    "NullableAndRepeatedStructTable.scala",
     """[
+      |  {"name": "id", "mode": "REQUIRED", "type": "STRING"},
       |  {"name": "struct_field_required", "mode": "REQUIRED", "type": "RECORD", "fields": [
       |    {"name": "required_1", "mode": "REQUIRED", "type": "INT64"},
       |    {"name": "required_2", "mode": "REQUIRED", "type": "TIMESTAMP"}
