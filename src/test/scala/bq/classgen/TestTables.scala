@@ -12,26 +12,26 @@ object TestTables {
 
     if (Option(dataset.get("simple")).isEmpty) {
       val sql = s"create table `$datasetId.simple`(foo string, bar int64)"
-      CreateTable.createTableUsingSql(sql)
+      BqUtil.createTableUsingSql(sql)
     }
 
     if (Option(dataset.get(STRUCTURED_TABLE.tableId)).isEmpty)
-      CreateTable.createTableUsingJson(datasetId,
+      BqUtil.createTableUsingJson(datasetId,
                                        STRUCTURED_TABLE.tableId,
                                        STRUCTURED_TABLE.schemaJson)
 
     if (Option(dataset.get(VARIOUS_TYPE_TABLE.tableId)).isEmpty)
-      CreateTable.createTableUsingJson(datasetId,
+      BqUtil.createTableUsingJson(datasetId,
                                        VARIOUS_TYPE_TABLE.tableId,
                                        VARIOUS_TYPE_TABLE.schemaJson)
 
     if (Option(dataset.get(NULLABLE_AND_REPEATED_TABLE.tableId)).isEmpty)
-      CreateTable.createTableUsingJson(datasetId,
+      BqUtil.createTableUsingJson(datasetId,
                                        NULLABLE_AND_REPEATED_TABLE.tableId,
                                        NULLABLE_AND_REPEATED_TABLE.schemaJson)
 
     if (Option(dataset.get(NULLABLE_AND_REPEATED_STRUCT_TABLE.tableId)).isEmpty)
-      CreateTable.createTableUsingJson(datasetId,
+      BqUtil.createTableUsingJson(datasetId,
                                        NULLABLE_AND_REPEATED_STRUCT_TABLE.tableId,
                                        NULLABLE_AND_REPEATED_STRUCT_TABLE.schemaJson)
 
@@ -39,7 +39,7 @@ object TestTables {
 
   def createSimpleTable(datasetId: String): Unit = {
     val sql = s"create table `$datasetId.simple`(foo string, bar int64)"
-    CreateTable.createTableUsingSql(sql)
+    BqUtil.createTableUsingSql(sql)
   }
 
   val STRUCTURED_TABLE = TableInfo(

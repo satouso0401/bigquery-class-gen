@@ -4,7 +4,7 @@ import java.util.UUID
 
 import com.google.cloud.bigquery._
 
-object CreateTable {
+object BqUtil {
   def createTableUsingJson(datasetId: String, tableId: String, schemaJson: String) = {
     val bigquery        = BigQueryOptions.getDefaultInstance.getService
     val dataset         = bigquery.getDataset(datasetId)
