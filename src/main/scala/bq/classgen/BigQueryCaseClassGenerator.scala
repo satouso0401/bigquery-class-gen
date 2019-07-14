@@ -10,6 +10,64 @@ import org.scalafmt.interfaces.Scalafmt
 import scala.collection.JavaConverters._
 
 object BigQueryCaseClassGenerator {
+  val NothingOverwriteType: PartialFunction[StandardSQLTypeName, String] = {
+    case _ if false => ""
+  }
+  val NothingOverwriteClassToRow: PartialFunction[(StandardSQLTypeName, String), String] = {
+    case _ if false => ""
+  }
+  val NothingOverwriteFunctorToRow: PartialFunction[(StandardSQLTypeName, String), String] = {
+    case _ if false => ""
+  }
+
+  /**
+    * Create BigQueryCaseClassGenerator
+    * @param importClass import class
+    * @param overwriteType customize the mapping of BigQuery type and class field type
+    * @param overwriteClassToRow customize class field to BigQuery row conversion
+    * @param overwriteFunctorToRow customize functor field to BigQuery row conversion
+    * @return BigQueryCaseClassGenerator
+    */
+  def apply(importClass: Seq[String] = Nil,
+            overwriteType: PartialFunction[StandardSQLTypeName, String] = NothingOverwriteType,
+            overwriteClassToRow: PartialFunction[(StandardSQLTypeName, String), String] =
+              NothingOverwriteClassToRow,
+            overwriteFunctorToRow: PartialFunction[(StandardSQLTypeName, String), String] =
+              NothingOverwriteFunctorToRow) =
+    new BigQueryCaseClassGenerator(importClass,
+                                   overwriteType,
+                                   overwriteClassToRow,
+                                   overwriteFunctorToRow)
+
+  lazy val scalafmt = Scalafmt
+    .create(this.getClass.getClassLoader)
+    .withRespectVersion(false)
+    .withDefaultVersion("2.0.0")
+
+  def format(code: String) = {
+    val config: Path = Paths.get(".scalafmt.conf")
+
+    if (Files.exists(config)) {
+      scalafmt.format(config, Paths.get("NotExistFile.scala"), code)
+    } else code
+
+  }
+}
+
+/**
+  * This class makes case class from BigQuery
+  * @param importClass import class
+  * @param overwriteType customize the mapping of BigQuery type and class field type
+  * @param overwriteClassToRow customize class field to BigQuery row conversion
+  * @param overwriteFunctorToRow customize functor field to BigQuery row conversion
+  */
+class BigQueryCaseClassGenerator(
+    importClass: Seq[String],
+    overwriteType: PartialFunction[StandardSQLTypeName, String],
+    overwriteClassToRow: PartialFunction[(StandardSQLTypeName, String), String],
+    overwriteFunctorToRow: PartialFunction[(StandardSQLTypeName, String), String]) {
+
+  import bq.classgen.BigQueryCaseClassGenerator.format
 
   case class FieldInfo(field: String, mappingPair: String)
   case class StructInfo(field: String,
@@ -18,14 +76,13 @@ object BigQueryCaseClassGenerator {
                         mappingDef: Seq[String])
 
   // TODO case classからBQへの登録用のオブジェクトへ変換する際に、ScalaのMapを使っているが、JavaのMapに直接変換した方が良いかもしれない
-  // TODO BQの型に対応するScalaの型をカスタマイズできるようにする
 
   /**
     * Generate code of case class from BigQuery schema.
     * @param datasetId dataset to reference
     * @param outputDir case class output directory
     * @param outputPkg package to which the case class belongs
-    * @param separatePackagesByTable Option to change output package when struct with same name exists
+    * @param separatePackagesByTable option to change output package when struct with same name exists
     * @param bigquery BigQuery service object
     */
   def run(datasetId: String,
@@ -50,6 +107,7 @@ object BigQueryCaseClassGenerator {
       // write file
       val objectName = tableName
       val pkg        = if (separatePackagesByTable) s"$outputPkg.${tableName.toLowerCase}" else outputPkg
+      val importCode = importClass.map(x => s"import $x").mkString("\n")
       val packageContainerCode =
         s"""package $pkg
            |
@@ -57,6 +115,8 @@ object BigQueryCaseClassGenerator {
            |import java.time.{LocalDate, LocalDateTime, LocalTime, ZonedDateTime}
            |import java.util.Base64
            |import scala.collection.JavaConverters._
+           |
+           |$importCode
            |
            |$codeBody
            |""".stripMargin
@@ -105,7 +165,7 @@ object BigQueryCaseClassGenerator {
     caseClass + "\n" + mappingDef
   }
 
-  def generateField(bqField: Field): Either[FieldInfo, StructInfo] = {
+  private def generateField(bqField: Field): Either[FieldInfo, StructInfo] = {
     if (bqField.getType.getStandardType == StandardSQLTypeName.STRUCT) {
       val childFieldList = bqField.getSubFields.iterator().asScala.toSeq.map(x => generateField(x))
       Right(generateStruct(bqField.getName, bqField.getMode, childFieldList))
@@ -171,15 +231,16 @@ object BigQueryCaseClassGenerator {
     )
   }
 
-  def generateBasicField(bqFieldName: String,
-                         bqFieldType: StandardSQLTypeName,
-                         bqFieldMode: Field.Mode) = {
+  private def generateBasicField(bqFieldName: String,
+                                 bqFieldType: StandardSQLTypeName,
+                                 bqFieldMode: Field.Mode) = {
     import com.google.cloud.bigquery.Field.Mode._
     import com.google.cloud.bigquery.StandardSQLTypeName._
 
     // case class field
     val fieldName = bqFieldName.lCamel
-    val fieldType = bqFieldType match {
+
+    val defaultType: PartialFunction[StandardSQLTypeName, String] = {
       case INT64     => "Long"
       case NUMERIC   => "Long"
       case FLOAT64   => "Double"
@@ -193,6 +254,9 @@ object BigQueryCaseClassGenerator {
       case x         => throw new UnsupportedOperationException(s"$x field not supported")
     }
 
+    val typeMatcher = overwriteType orElse defaultType
+    val fieldType   = typeMatcher(bqFieldType)
+
     val modeWrappedType = bqFieldMode match {
       case NULLABLE => s"Option[$fieldType]"
       case REPEATED => s"Seq[$fieldType]"
@@ -200,50 +264,51 @@ object BigQueryCaseClassGenerator {
     }
     val thisField = s"$fieldName: $modeWrappedType"
 
+    val defaultClassToRow: PartialFunction[(StandardSQLTypeName, String), String] = {
+      case (INT64, fn)     => s"""x.$fn"""
+      case (NUMERIC, fn)   => s"""x.$fn"""
+      case (FLOAT64, fn)   => s"""x.$fn"""
+      case (BOOL, fn)      => s"""x.$fn"""
+      case (STRING, fn)    => s"""x.$fn"""
+      case (BYTES, fn)     => s"""Base64.getEncoder.encodeToString(x.$fn)"""
+      case (DATE, fn)      => s"""x.$fn.format(DateTimeFormatter.ISO_LOCAL_DATE)"""
+      case (DATETIME, fn)  => s"""x.$fn.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)"""
+      case (TIME, fn)      => s"""x.$fn.format(DateTimeFormatter.ISO_LOCAL_TIME)"""
+      case (TIMESTAMP, fn) => s"""x.$fn.toInstant.getEpochSecond"""
+      case x               => throw new UnsupportedOperationException(s"$x field not supported")
+    }
+
+    val classToRowMatcher = overwriteClassToRow orElse defaultClassToRow
+
+    val defultFunctorToRow: PartialFunction[(StandardSQLTypeName, String), String] = {
+      case (INT64, fn)     => s"x.$fn"
+      case (NUMERIC, fn)   => s"x.$fn"
+      case (FLOAT64, fn)   => s"x.$fn"
+      case (BOOL, fn)      => s"x.$fn"
+      case (STRING, fn)    => s"x.$fn"
+      case (BYTES, fn)     => s"x.$fn.map(Base64.getEncoder.encodeToString)"
+      case (DATE, fn)      => s"x.$fn.map(_.format(DateTimeFormatter.ISO_LOCAL_DATE))"
+      case (DATETIME, fn)  => s"x.$fn.map(_.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))"
+      case (TIME, fn)      => s"x.$fn.map(_.format(DateTimeFormatter.ISO_LOCAL_TIME))"
+      case (TIMESTAMP, fn) => s"x.$fn.map(_.toInstant.getEpochSecond)"
+      case x               => throw new UnsupportedOperationException(s"$x field not supported")
+    }
+
+    val functorToRowMatcher = overwriteFunctorToRow orElse defultFunctorToRow
+
     // column mapping
     val mappingFunc =
       bqFieldMode match {
         case NULLABLE | REPEATED =>
-          val func = bqFieldType match {
-            case INT64 | NUMERIC | FLOAT64 | BOOL | STRING => s"x.$fieldName"
-            case BYTES                                     => s"x.$fieldName.map(y => Base64.getEncoder.encodeToString(y))"
-            case DATE                                      => s"x.$fieldName.map(_.format(DateTimeFormatter.ISO_LOCAL_DATE))"
-            case DATETIME                                  => s"x.$fieldName.map(_.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))"
-            case TIME                                      => s"x.$fieldName.map(_.format(DateTimeFormatter.ISO_LOCAL_TIME))"
-            case TIMESTAMP                                 => s"x.$fieldName.map(_.toInstant.getEpochSecond)"
-            case x                                         => throw new UnsupportedOperationException(s"$x field not supported")
-          }
+          val func = functorToRowMatcher((bqFieldType, fieldName))
           if (bqFieldMode == NULLABLE) func + ".getOrElse(null)" else func + ".asJava"
-        case _ =>
-          bqFieldType match {
-            case INT64 | NUMERIC | FLOAT64 | BOOL | STRING => s"""x.$fieldName"""
-            case BYTES                                     => s"""Base64.getEncoder.encodeToString(x.$fieldName)"""
-            case DATE                                      => s"""x.$fieldName.format(DateTimeFormatter.ISO_LOCAL_DATE)"""
-            case DATETIME                                  => s"""x.$fieldName.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)"""
-            case TIME                                      => s"""x.$fieldName.format(DateTimeFormatter.ISO_LOCAL_TIME)"""
-            case TIMESTAMP                                 => s"""x.$fieldName.toInstant.getEpochSecond"""
-            case x                                         => throw new UnsupportedOperationException(s"$x field not supported")
-          }
+        case _ => classToRowMatcher((bqFieldType, fieldName))
 
       }
 
     val thisMapPair = s""""$bqFieldName" -> $mappingFunc"""
 
     FieldInfo(thisField, thisMapPair)
-  }
-
-  lazy val scalafmt = Scalafmt
-    .create(this.getClass.getClassLoader)
-    .withRespectVersion(false)
-    .withDefaultVersion("2.0.0")
-
-  private def format(code: String) = {
-    val config: Path = Paths.get(".scalafmt.conf")
-
-    if (Files.exists(config)) {
-      scalafmt.format(config, Paths.get("NotExistFile.scala"), code)
-    } else code
-
   }
 
   private def writeFile(outputDir: String,
