@@ -7,7 +7,7 @@ import scala.collection.JavaConverters._
 
 case class VariousType(
     int64: Long,
-    numeric: Long,
+    numeric: BigDecimal,
     float64: Double,
     bool: Boolean,
     string: String,

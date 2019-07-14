@@ -7,7 +7,7 @@ import scala.collection.JavaConverters._
 
 case class NullableAndRepeated(
     int64Null: Option[Long],
-    numericNull: Option[Long],
+    numericNull: Option[BigDecimal],
     float64Null: Option[Double],
     boolNull: Option[Boolean],
     stringNull: Option[String],
@@ -17,7 +17,7 @@ case class NullableAndRepeated(
     timeNull: Option[LocalTime],
     timestampNull: Option[ZonedDateTime],
     int64List: Seq[Long],
-    numericList: Seq[Long],
+    numericList: Seq[BigDecimal],
     float64List: Seq[Double],
     boolList: Seq[Boolean],
     stringList: Seq[String],

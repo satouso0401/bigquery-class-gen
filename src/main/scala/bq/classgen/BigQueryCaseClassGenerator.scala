@@ -242,7 +242,7 @@ class BigQueryCaseClassGenerator(
 
     val defaultType: PartialFunction[StandardSQLTypeName, String] = {
       case INT64     => "Long"
-      case NUMERIC   => "Long"
+      case NUMERIC   => "BigDecimal"
       case FLOAT64   => "Double"
       case BOOL      => "Boolean"
       case STRING    => "String"
