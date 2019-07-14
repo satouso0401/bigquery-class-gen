@@ -1,14 +1,13 @@
 package bq.classgen
 
-import com.google.cloud.bigquery.{BigQueryOptions, Table}
+import com.google.cloud.bigquery.{BigQuery, BigQueryOptions, Table}
 
 object TestTables {
 
   case class TableInfo(tableId: String, schemaJson: String)
 
-  def createTable(datasetId: String) = {
-    val bigQuery = BigQueryOptions.getDefaultInstance.getService
-    val dataset  = bigQuery.getDataset(datasetId)
+  def createTable(datasetId: String)(implicit bigquery: BigQuery) = {
+    val dataset  = bigquery.getDataset(datasetId)
 
     if (Option(dataset.get("simple")).isEmpty) {
       val sql = s"create table `$datasetId.simple`(foo string, bar int64)"
@@ -37,7 +36,7 @@ object TestTables {
 
   }
 
-  def createSimpleTable(datasetId: String): Unit = {
+  def createSimpleTable(datasetId: String)(implicit bigquery: BigQuery): Unit = {
     val sql = s"create table `$datasetId.simple`(foo string, bar int64)"
     BqUtil.createTableUsingSql(sql)
   }

@@ -7,7 +7,7 @@ import scala.collection.JavaConverters._
 
 case class NullableAndRepeated(
     int64Null: Option[Long],
-    numericNull: Option[Long],
+    numericNull: Option[BigDecimal],
     float64Null: Option[Double],
     boolNull: Option[Boolean],
     stringNull: Option[String],
@@ -17,7 +17,7 @@ case class NullableAndRepeated(
     timeNull: Option[LocalTime],
     timestampNull: Option[ZonedDateTime],
     int64List: Seq[Long],
-    numericList: Seq[Long],
+    numericList: Seq[BigDecimal],
     float64List: Seq[Double],
     boolList: Seq[Boolean],
     stringList: Seq[String],
@@ -37,7 +37,7 @@ object NullableAndRepeated {
         "float64_null" -> x.float64Null.getOrElse(null),
         "bool_null"    -> x.boolNull.getOrElse(null),
         "string_null"  -> x.stringNull.getOrElse(null),
-        "bytes_null"   -> x.bytesNull.map(y => Base64.getEncoder.encodeToString(y)).getOrElse(null),
+        "bytes_null"   -> x.bytesNull.map(Base64.getEncoder.encodeToString).getOrElse(null),
         "date_null"    -> x.dateNull.map(_.format(DateTimeFormatter.ISO_LOCAL_DATE)).getOrElse(null),
         "datetime_null" -> x.datetimeNull
           .map(_.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
@@ -49,7 +49,7 @@ object NullableAndRepeated {
         "float64_list"   -> x.float64List.asJava,
         "bool_list"      -> x.boolList.asJava,
         "string_list"    -> x.stringList.asJava,
-        "bytes_list"     -> x.bytesList.map(y => Base64.getEncoder.encodeToString(y)).asJava,
+        "bytes_list"     -> x.bytesList.map(Base64.getEncoder.encodeToString).asJava,
         "date_list"      -> x.dateList.map(_.format(DateTimeFormatter.ISO_LOCAL_DATE)).asJava,
         "datetime_list" -> x.datetimeList
           .map(_.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
