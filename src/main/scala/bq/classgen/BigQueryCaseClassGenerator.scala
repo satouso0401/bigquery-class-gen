@@ -19,7 +19,6 @@ object BigQueryCaseClassGenerator {
 
   // TODO case classからBQへの登録用のオブジェクトへ変換する際に、ScalaのMapを使っているが、JavaのMapに直接変換した方が良いかもしれない
   // TODO BQの型に対応するScalaの型をカスタマイズできるようにする
-  // TODO テストのしやすさ、カスタムマッピングの作りやすさのためにBQアクセスの結果はcase classで受け取れるようにする
 
   /**
     * Generate code of case class from BigQuery schema.
@@ -109,142 +108,128 @@ object BigQueryCaseClassGenerator {
   def generateField(bqField: Field): Either[FieldInfo, StructInfo] = {
     if (bqField.getType.getStandardType == StandardSQLTypeName.STRUCT) {
       val childFieldList = bqField.getSubFields.iterator().asScala.toSeq.map(x => generateField(x))
-
-      val fieldName = bqField.getName.lCamel
-      val fieldType = bqField.getName.UCamel
-
-      // generate case class code
-      val modeWrappedType = bqField.getMode match {
-        case NULLABLE => s"Option[$fieldType]"
-        case REPEATED => s"Seq[$fieldType]"
-        case _        => fieldType
-      }
-      val thisField = s"$fieldName: $modeWrappedType"
-      val thisClass = {
-        val childFields = childFieldList
-          .map {
-            case Left(x)  => x.field
-            case Right(x) => x.field
-          }
-          .mkString(", ")
-        s"case class $fieldType($childFields)"
-      }
-      val childClassList = childFieldList.collect { case Right(x) => x }.flatMap(_.structDef)
-
-      // generate mapping def
-      val bqFieldName    = bqField.getName
-      val mappingDefName = bqField.getName.lCamel
-      val thisMappingPair = bqField.getMode match {
-        case NULLABLE => s""""$bqFieldName" -> x.$fieldName.map($mappingDefName).getOrElse(null)"""
-        case REPEATED => s""""$bqFieldName" -> x.$fieldName.map($mappingDefName).asJava"""
-        case _        => s""""$bqFieldName" -> $mappingDefName(x.$fieldName)"""
-      }
-
-      val thisMappingDef = {
-        val childMappingPair = childFieldList
-          .map {
-            case Left(x)  => x.mappingPair
-            case Right(x) => x.mappingPair
-          }
-          .mkString(", ")
-        s"def $mappingDefName(x: $fieldType) = { Map($childMappingPair)}.asJava"
-      }
-      val childMapDefList = childFieldList.collect { case Right(x) => x }.flatMap(_.mappingDef)
-
-      Right(
-        StructInfo(
-          thisField,
-          childClassList :+ thisClass,
-          thisMappingPair,
-          childMapDefList :+ thisMappingDef
-        )
-      )
+      Right(generateStruct(bqField.getName, bqField.getMode, childFieldList))
 
     } else {
-      import com.google.cloud.bigquery.Field.Mode._
-      import com.google.cloud.bigquery.StandardSQLTypeName._
 
-      // case class field
-      val fieldName = bqField.getName.lCamel
-      val fieldType = bqField.getType.getStandardType match {
-        case INT64     => "Long"
-        case NUMERIC   => "Long"
-        case FLOAT64   => "Double"
-        case BOOL      => "Boolean"
-        case STRING    => "String"
-        case BYTES     => "Array[Byte]"
-        case DATE      => "LocalDate"
-        case DATETIME  => "LocalDateTime"
-        case TIME      => "LocalTime"
-        case TIMESTAMP => "ZonedDateTime"
-        case x         => throw new UnsupportedOperationException(s"$x field not supported")
-      }
-      val modeWrappedType = bqField.getMode match {
-        case NULLABLE => s"Option[$fieldType]"
-        case REPEATED => s"Seq[$fieldType]"
-        case _        => fieldType
-      }
-      val thisField = s"$fieldName: $modeWrappedType"
+      val bqFieldName = bqField.getName
+      val bqFieldType = bqField.getType.getStandardType
+      val bqFieldMode = bqField.getMode
 
-      // column mapping
-
-      val mappingFunc =
-        bqField.getMode match {
-          case NULLABLE | REPEATED =>
-            val func = bqField.getType.getStandardType match {
-              case INT64 | NUMERIC | FLOAT64 | BOOL | STRING => s"x.$fieldName"
-              case BYTES                                     => s"x.$fieldName.map(y => Base64.getEncoder.encodeToString(y))"
-              case DATE                                      => s"x.$fieldName.map(_.format(DateTimeFormatter.ISO_LOCAL_DATE))"
-              case DATETIME                                  => s"x.$fieldName.map(_.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))"
-              case TIME                                      => s"x.$fieldName.map(_.format(DateTimeFormatter.ISO_LOCAL_TIME))"
-              case TIMESTAMP                                 => s"x.$fieldName.map(_.toInstant.getEpochSecond)"
-              case x                                         => throw new UnsupportedOperationException(s"$x field not supported")
-            }
-            if (bqField.getMode == NULLABLE) func + ".getOrElse(null)" else func + ".asJava"
-          case _ =>
-            bqField.getType.getStandardType match {
-              case INT64 | NUMERIC | FLOAT64 | BOOL | STRING => s"""x.$fieldName"""
-              case BYTES                                     => s"""Base64.getEncoder.encodeToString(x.$fieldName)"""
-              case DATE                                      => s"""x.$fieldName.format(DateTimeFormatter.ISO_LOCAL_DATE)"""
-              case DATETIME                                  => s"""x.$fieldName.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)"""
-              case TIME                                      => s"""x.$fieldName.format(DateTimeFormatter.ISO_LOCAL_TIME)"""
-              case TIMESTAMP                                 => s"""x.$fieldName.toInstant.getEpochSecond"""
-              case x                                         => throw new UnsupportedOperationException(s"$x field not supported")
-            }
-
-        }
-
-      val thisMapPair = s""""${bqField.getName}" -> $mappingFunc"""
-
-      Left(FieldInfo(thisField, thisMapPair))
+      Left(generateBasicField(bqFieldName, bqFieldType, bqFieldMode))
     }
   }
 
-  private def structField(fieldName: String, fieldType: String) = s"$fieldName: $fieldType"
+  private def generateStruct(bqFieldName: String,
+                             bqFieldMode: Field.Mode,
+                             childFieldList: Seq[Either[FieldInfo, StructInfo]]) = {
+    val fieldName = bqFieldName.lCamel
+    val fieldType = bqFieldName.UCamel
 
-  private def structClass(fieldType: String, childFieldList: Seq[Either[FieldInfo, StructInfo]]) = {
-    val childFields = childFieldList
-      .map {
-        case Left(x)  => x.field
-        case Right(x) => x.field
-      }
-      .mkString(", ")
-    s"case class $fieldType($childFields)"
+    // generate case class code
+    val modeWrappedType = bqFieldMode match {
+      case NULLABLE => s"Option[$fieldType]"
+      case REPEATED => s"Seq[$fieldType]"
+      case _        => fieldType
+    }
+    val thisField = s"$fieldName: $modeWrappedType"
+    val thisClass = {
+      val childFields = childFieldList
+        .map {
+          case Left(x)  => x.field
+          case Right(x) => x.field
+        }
+        .mkString(", ")
+      s"case class $fieldType($childFields)"
+    }
+    val childClassList = childFieldList.collect { case Right(x) => x }.flatMap(_.structDef)
+
+    // generate mapping def
+    val mappingDefName = bqFieldName.lCamel
+    val thisMappingPair = bqFieldMode match {
+      case NULLABLE => s""""$bqFieldName" -> x.$fieldName.map($mappingDefName).getOrElse(null)"""
+      case REPEATED => s""""$bqFieldName" -> x.$fieldName.map($mappingDefName).asJava"""
+      case _        => s""""$bqFieldName" -> $mappingDefName(x.$fieldName)"""
+    }
+
+    val thisMappingDef = {
+      val childMappingPair = childFieldList
+        .map {
+          case Left(x)  => x.mappingPair
+          case Right(x) => x.mappingPair
+        }
+        .mkString(", ")
+      s"def $mappingDefName(x: $fieldType) = { Map($childMappingPair)}.asJava"
+    }
+    val childMapDefList = childFieldList.collect { case Right(x) => x }.flatMap(_.mappingDef)
+
+    StructInfo(
+      thisField,
+      childClassList :+ thisClass,
+      thisMappingPair,
+      childMapDefList :+ thisMappingDef
+    )
   }
 
-  private def structMappingPair(bqFieldName: String, mappingDefName: String, fieldName: String) =
-    s""""$bqFieldName" -> $mappingDefName(x.$fieldName)"""
+  def generateBasicField(bqFieldName: String,
+                         bqFieldType: StandardSQLTypeName,
+                         bqFieldMode: Field.Mode) = {
+    import com.google.cloud.bigquery.Field.Mode._
+    import com.google.cloud.bigquery.StandardSQLTypeName._
 
-  private def structMappingDef(mappingDefName: String,
-                               fieldType: String,
-                               childFieldList: Seq[Either[FieldInfo, StructInfo]]) = {
-    val childMappingPair = childFieldList
-      .map {
-        case Left(x)  => x.mappingPair
-        case Right(x) => x.mappingPair
+    // case class field
+    val fieldName = bqFieldName.lCamel
+    val fieldType = bqFieldType match {
+      case INT64     => "Long"
+      case NUMERIC   => "Long"
+      case FLOAT64   => "Double"
+      case BOOL      => "Boolean"
+      case STRING    => "String"
+      case BYTES     => "Array[Byte]"
+      case DATE      => "LocalDate"
+      case DATETIME  => "LocalDateTime"
+      case TIME      => "LocalTime"
+      case TIMESTAMP => "ZonedDateTime"
+      case x         => throw new UnsupportedOperationException(s"$x field not supported")
+    }
+
+    val modeWrappedType = bqFieldMode match {
+      case NULLABLE => s"Option[$fieldType]"
+      case REPEATED => s"Seq[$fieldType]"
+      case _        => fieldType
+    }
+    val thisField = s"$fieldName: $modeWrappedType"
+
+    // column mapping
+    val mappingFunc =
+      bqFieldMode match {
+        case NULLABLE | REPEATED =>
+          val func = bqFieldType match {
+            case INT64 | NUMERIC | FLOAT64 | BOOL | STRING => s"x.$fieldName"
+            case BYTES                                     => s"x.$fieldName.map(y => Base64.getEncoder.encodeToString(y))"
+            case DATE                                      => s"x.$fieldName.map(_.format(DateTimeFormatter.ISO_LOCAL_DATE))"
+            case DATETIME                                  => s"x.$fieldName.map(_.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))"
+            case TIME                                      => s"x.$fieldName.map(_.format(DateTimeFormatter.ISO_LOCAL_TIME))"
+            case TIMESTAMP                                 => s"x.$fieldName.map(_.toInstant.getEpochSecond)"
+            case x                                         => throw new UnsupportedOperationException(s"$x field not supported")
+          }
+          if (bqFieldMode == NULLABLE) func + ".getOrElse(null)" else func + ".asJava"
+        case _ =>
+          bqFieldType match {
+            case INT64 | NUMERIC | FLOAT64 | BOOL | STRING => s"""x.$fieldName"""
+            case BYTES                                     => s"""Base64.getEncoder.encodeToString(x.$fieldName)"""
+            case DATE                                      => s"""x.$fieldName.format(DateTimeFormatter.ISO_LOCAL_DATE)"""
+            case DATETIME                                  => s"""x.$fieldName.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)"""
+            case TIME                                      => s"""x.$fieldName.format(DateTimeFormatter.ISO_LOCAL_TIME)"""
+            case TIMESTAMP                                 => s"""x.$fieldName.toInstant.getEpochSecond"""
+            case x                                         => throw new UnsupportedOperationException(s"$x field not supported")
+          }
+
       }
-      .mkString(", ")
-    s"def $mappingDefName(x: $fieldType) = { Map($childMappingPair)}.asJava"
+
+    val thisMapPair = s""""$bqFieldName" -> $mappingFunc"""
+
+    FieldInfo(thisField, thisMapPair)
   }
 
   lazy val scalafmt = Scalafmt
