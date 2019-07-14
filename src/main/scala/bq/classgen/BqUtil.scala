@@ -20,7 +20,7 @@ object BqUtil {
     fromPbMethod.invoke(null, dtoSchema).asInstanceOf[Schema]
   }
 
-  def convert(jsonSchemaString: String): Schema = {
+  private def convert(jsonSchemaString: String): Schema = {
     val fieldsListDto =
       parser
         .createJsonParser(jsonSchemaString)
@@ -33,7 +33,14 @@ object BqUtil {
     dtoTableSchemaToBqSchema(schemaDto)
   }
 
-  def createTableUsingJson(datasetId: String, tableId: String, schemaJson: String) = {
+  /**
+    * create a table using json
+    * @param datasetId dataset id
+    * @param tableId id of the table to create
+    * @param schemaJson table schema definition
+    * @param bigquery BigQuery service object
+    */
+  def createTableUsingJson(datasetId: String, tableId: String, schemaJson: String)(implicit bigquery: BigQuery): Unit = {
     val bigquery        = BigQueryOptions.getDefaultInstance.getService
     val dataset         = bigquery.getDataset(datasetId)
     val schema          = convert(schemaJson)
@@ -41,8 +48,12 @@ object BqUtil {
     dataset.create(tableId, tableDefinition)
   }
 
-  def createTableUsingSql(createQuery: String) = {
-    val bigquery = BigQueryOptions.getDefaultInstance.getService
+  /**
+    * Create a table using sql
+    * @param createQuery table schema definition
+    * @param bigquery BigQuery service object
+    */
+  def createTableUsingSql(createQuery: String)(implicit bigquery: BigQuery) = {
 
     val queryConfig = QueryJobConfiguration
       .newBuilder(createQuery)

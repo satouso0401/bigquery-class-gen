@@ -4,13 +4,12 @@ import java.io.{BufferedWriter, File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
 
 import com.google.cloud.bigquery.Field.Mode.{NULLABLE, REPEATED}
-import com.google.cloud.bigquery.{BigQueryOptions, Field, StandardSQLTypeName, TableDefinition}
+import com.google.cloud.bigquery._
 import org.scalafmt.interfaces.Scalafmt
+
 import scala.collection.JavaConverters._
 
 object BigQueryCaseClassGenerator {
-
-  private val bigquery = BigQueryOptions.getDefaultInstance.getService
 
   case class FieldInfo(field: String, mappingPair: String)
   case class StructInfo(field: String,
@@ -20,10 +19,20 @@ object BigQueryCaseClassGenerator {
 
   // TODO case classからBQへの登録用のオブジェクトへ変換する際に、ScalaのMapを使っているが、JavaのMapに直接変換した方が良いかもしれない
   // TODO BQの型に対応するScalaの型をカスタマイズできるようにする
-  // TODO case classに使用していない型のインポートも入ってしまうのを削除する
-  // TODO [やれたらやる] BQからの読み込み時のデータマッピング処理の追加
+  // TODO テストのしやすさ、カスタムマッピングの作りやすさのためにBQアクセスの結果はcase classで受け取れるようにする
 
-  def run(datasetId: String, outputDir: String, outputPkg: String, separatePackagesByTable: Boolean = false): Unit = {
+  /**
+    * Generate code of case class from BigQuery schema.
+    * @param datasetId dataset to reference
+    * @param outputDir case class output directory
+    * @param outputPkg package to which the case class belongs
+    * @param separatePackagesByTable Option to change output package when struct with same name exists
+    * @param bigquery BigQuery service object
+    */
+  def run(datasetId: String,
+          outputDir: String,
+          outputPkg: String,
+          separatePackagesByTable: Boolean = false)(implicit bigquery: BigQuery): Unit = {
 
     // table list
     val tableIdList =
@@ -41,7 +50,7 @@ object BigQueryCaseClassGenerator {
 
       // write file
       val objectName = tableName
-      val pkg = if (separatePackagesByTable) s"$outputPkg.${tableName.toLowerCase}" else outputPkg
+      val pkg        = if (separatePackagesByTable) s"$outputPkg.${tableName.toLowerCase}" else outputPkg
       val packageContainerCode =
         s"""package $pkg
            |

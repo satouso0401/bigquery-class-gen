@@ -28,7 +28,7 @@ class BigQueryCaseClassGeneratorSpec
   val expectFileDir = "src/test/resources/output/bq/testdataset/"
   val actualFileDir = "src/test/scala/output/bq/testdataset/"
 
-  val bigQuery = BigQueryOptions.getDefaultInstance.getService
+  implicit val bigQuery = BigQueryOptions.getDefaultInstance.getService
 
   before {
     TestTables.createTable(datasetId)
