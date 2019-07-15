@@ -4,13 +4,12 @@ BigQuery Class Gen
 Generate code of case class from BigQuery schema.
 The generated case class also provides functionality to convert Scala objects to BigQuery row content.
 
-## Dependency
+## Installation
 
 Add to build.sbt
 
 ```
-lazy val root = (project in file(".")).dependsOn(bqClassGen)
-lazy val bqClassGen = ClasspathDependency(RootProject(uri("git://github.com/satouso0401/bigquery-class-gen")), None)
+libraryDependencies += "com.github.satouso0401" %% "bigquery-class-gen" % "0.2.1"
 ```
 
 ## Usage
@@ -75,3 +74,7 @@ BigQueryCaseClassGenerator(
   BigQueryCaseClassGenerator.NothingOverwriteFunctorToRow
 ).run(datasetId, outputDir, outputPkg)
 ```
+
+## Sample code
+
+https://github.com/satouso0401/bigquery-class-gen-sample
