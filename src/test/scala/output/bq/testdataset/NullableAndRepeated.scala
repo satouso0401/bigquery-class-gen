@@ -1,7 +1,9 @@
 package output.bq.testdataset
 
+import java.lang.{Long, Double, Boolean}
 import java.time.format.DateTimeFormatter
 import java.time.{LocalDate, LocalDateTime, LocalTime, ZonedDateTime}
+import java.util
 import java.util.Base64
 import scala.collection.JavaConverters._
 
@@ -30,34 +32,40 @@ case class NullableAndRepeated(
 
 object NullableAndRepeated {
   implicit class ToBqRow(val x: NullableAndRepeated) {
-    def toBqRow = {
-      Map(
-        "int64_null"   -> x.int64Null.getOrElse(null),
-        "numeric_null" -> x.numericNull.getOrElse(null),
-        "float64_null" -> x.float64Null.getOrElse(null),
-        "bool_null"    -> x.boolNull.getOrElse(null),
-        "string_null"  -> x.stringNull.getOrElse(null),
-        "bytes_null"   -> x.bytesNull.map(Base64.getEncoder.encodeToString).getOrElse(null),
-        "date_null"    -> x.dateNull.map(_.format(DateTimeFormatter.ISO_LOCAL_DATE)).getOrElse(null),
-        "datetime_null" -> x.datetimeNull
-          .map(_.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
-          .getOrElse(null),
-        "time_null"      -> x.timeNull.map(_.format(DateTimeFormatter.ISO_LOCAL_TIME)).getOrElse(null),
-        "timestamp_null" -> x.timestampNull.map(_.toInstant.getEpochSecond).getOrElse(null),
-        "int64_list"     -> x.int64List.asJava,
-        "numeric_list"   -> x.numericList.asJava,
-        "float64_list"   -> x.float64List.asJava,
-        "bool_list"      -> x.boolList.asJava,
-        "string_list"    -> x.stringList.asJava,
-        "bytes_list"     -> x.bytesList.map(Base64.getEncoder.encodeToString).asJava,
-        "date_list"      -> x.dateList.map(_.format(DateTimeFormatter.ISO_LOCAL_DATE)).asJava,
-        "datetime_list" -> x.datetimeList
-          .map(_.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
-          .asJava,
-        "time_list"      -> x.timeList.map(_.format(DateTimeFormatter.ISO_LOCAL_TIME)).asJava,
-        "timestamp_list" -> x.timestampList.map(_.toInstant.getEpochSecond).asJava
+    def toBqRow: util.Map[String, Object] = new util.HashMap[String, Object]() {
+      put("int64_null", x.int64Null.map(y => Long.valueOf(y)).getOrElse(null))
+      put("numeric_null", x.numericNull.getOrElse(null))
+      put("float64_null", x.float64Null.map(y => Double.valueOf(y)).getOrElse(null))
+      put("bool_null", x.boolNull.map(y => Boolean.valueOf(y)).getOrElse(null))
+      put("string_null", x.stringNull.getOrElse(null))
+      put("bytes_null", x.bytesNull.map(Base64.getEncoder.encodeToString).getOrElse(null))
+      put("date_null", x.dateNull.map(_.format(DateTimeFormatter.ISO_LOCAL_DATE)).getOrElse(null))
+      put(
+        "datetime_null",
+        x.datetimeNull.map(_.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)).getOrElse(null)
       )
-    }.asJava
+      put("time_null", x.timeNull.map(_.format(DateTimeFormatter.ISO_LOCAL_TIME)).getOrElse(null))
+      put(
+        "timestamp_null",
+        x.timestampNull.map(_.toInstant.getEpochSecond).map(y => Long.valueOf(y)).getOrElse(null)
+      )
+      put("int64_list", x.int64List.map(y => Long.valueOf(y)).asJava)
+      put("numeric_list", x.numericList.asJava)
+      put("float64_list", x.float64List.map(y => Double.valueOf(y)).asJava)
+      put("bool_list", x.boolList.map(y => Boolean.valueOf(y)).asJava)
+      put("string_list", x.stringList.asJava)
+      put("bytes_list", x.bytesList.map(Base64.getEncoder.encodeToString).asJava)
+      put("date_list", x.dateList.map(_.format(DateTimeFormatter.ISO_LOCAL_DATE)).asJava)
+      put(
+        "datetime_list",
+        x.datetimeList.map(_.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)).asJava
+      )
+      put("time_list", x.timeList.map(_.format(DateTimeFormatter.ISO_LOCAL_TIME)).asJava)
+      put(
+        "timestamp_list",
+        x.timestampList.map(_.toInstant.getEpochSecond).map(y => Long.valueOf(y)).asJava
+      )
+    }
   }
 
 }

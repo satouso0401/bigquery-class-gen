@@ -1,7 +1,9 @@
 package output.bq.testdataset
 
+import java.lang.{Long, Double, Boolean}
 import java.time.format.DateTimeFormatter
 import java.time.{LocalDate, LocalDateTime, LocalTime, ZonedDateTime}
+import java.util
 import java.util.Base64
 import scala.collection.JavaConverters._
 
@@ -17,25 +19,29 @@ case class StructFieldList(list1: Seq[Long], list2: Seq[ZonedDateTime])
 
 object NullableAndRepeatedStruct {
   implicit class ToBqRow(val x: NullableAndRepeatedStruct) {
-    def toBqRow = {
-      Map(
-        "id"                    -> x.id,
-        "struct_field_required" -> structFieldRequired(x.structFieldRequired),
-        "struct_field_null"     -> x.structFieldNull.map(structFieldNull).getOrElse(null),
-        "struct_field_list"     -> x.structFieldList.map(structFieldList).asJava
-      )
-    }.asJava
+    def toBqRow: util.Map[String, Object] = new util.HashMap[String, Object]() {
+      put("id", x.id)
+      put("struct_field_required", structFieldRequired(x.structFieldRequired))
+      put("struct_field_null", x.structFieldNull.map(structFieldNull).getOrElse(null))
+      put("struct_field_list", x.structFieldList.map(structFieldList).asJava)
+    }
   }
-  def structFieldRequired(x: StructFieldRequired) = {
-    Map("required_1" -> x.required1, "required_2" -> x.required2.toInstant.getEpochSecond)
-  }.asJava
-  def structFieldNull(x: StructFieldNull) = {
-    Map(
-      "null_1" -> x.null1.getOrElse(null),
-      "null_2" -> x.null2.map(_.toInstant.getEpochSecond).getOrElse(null)
-    )
-  }.asJava
-  def structFieldList(x: StructFieldList) = {
-    Map("list_1" -> x.list1.asJava, "list_2" -> x.list2.map(_.toInstant.getEpochSecond).asJava)
-  }.asJava
+  def structFieldRequired(x: StructFieldRequired): util.Map[String, Object] =
+    new util.HashMap[String, Object]() {
+      put("required_1", x.required1)
+      put("required_2", x.required2.toInstant.getEpochSecond)
+    }
+  def structFieldNull(x: StructFieldNull): util.Map[String, Object] =
+    new util.HashMap[String, Object]() {
+      put("null_1", x.null1.map(y => Long.valueOf(y)).getOrElse(null))
+      put(
+        "null_2",
+        x.null2.map(_.toInstant.getEpochSecond).map(y => Long.valueOf(y)).getOrElse(null)
+      )
+    }
+  def structFieldList(x: StructFieldList): util.Map[String, Object] =
+    new util.HashMap[String, Object]() {
+      put("list_1", x.list1.map(y => Long.valueOf(y)).asJava)
+      put("list_2", x.list2.map(_.toInstant.getEpochSecond).map(y => Long.valueOf(y)).asJava)
+    }
 }

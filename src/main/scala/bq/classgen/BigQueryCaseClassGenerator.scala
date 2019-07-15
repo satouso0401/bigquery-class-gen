@@ -111,8 +111,10 @@ class BigQueryCaseClassGenerator(
       val packageContainerCode =
         s"""package $pkg
            |
+           |import java.lang.{Long, Double, Boolean}
            |import java.time.format.DateTimeFormatter
            |import java.time.{LocalDate, LocalDateTime, LocalTime, ZonedDateTime}
+           |import java.util
            |import java.util.Base64
            |import scala.collection.JavaConverters._
            |
@@ -149,14 +151,14 @@ class BigQueryCaseClassGenerator(
         case Left(x)  => x.mappingPair
         case Right(x) => x.mappingPair
       }
-      .mkString(", ")
+      .mkString("\n      ")
 
     val nodeMappingDef = list.collect { case Right(x) => x.mappingDef }.flatten
     val mappingDef =
       s"""
          |object $tableName{
          |  implicit class ToBqRow(val x: $tableName) {
-         |    def toBqRow = { Map($rootMappingPair) }.asJava
+         |    def toBqRow: util.Map[String, Object] = new util.HashMap[String, Object]() {$rootMappingPair}
          |  }
          |  ${nodeMappingDef.distinct.mkString("\n  ")}
          |}
@@ -207,9 +209,9 @@ class BigQueryCaseClassGenerator(
     // generate mapping def
     val mappingDefName = bqFieldName.lCamel
     val thisMappingPair = bqFieldMode match {
-      case NULLABLE => s""""$bqFieldName" -> x.$fieldName.map($mappingDefName).getOrElse(null)"""
-      case REPEATED => s""""$bqFieldName" -> x.$fieldName.map($mappingDefName).asJava"""
-      case _        => s""""$bqFieldName" -> $mappingDefName(x.$fieldName)"""
+      case NULLABLE => s"""put("$bqFieldName", x.$fieldName.map($mappingDefName).getOrElse(null))"""
+      case REPEATED => s"""put("$bqFieldName", x.$fieldName.map($mappingDefName).asJava)"""
+      case _        => s"""put("$bqFieldName", $mappingDefName(x.$fieldName))"""
     }
 
     val thisMappingDef = {
@@ -218,8 +220,8 @@ class BigQueryCaseClassGenerator(
           case Left(x)  => x.mappingPair
           case Right(x) => x.mappingPair
         }
-        .mkString(", ")
-      s"def $mappingDefName(x: $fieldType) = { Map($childMappingPair)}.asJava"
+        .mkString("\n    ")
+      s"def $mappingDefName(x: $fieldType): util.Map[String, Object] = new util.HashMap[String, Object]() { $childMappingPair }"
     }
     val childMapDefList = childFieldList.collect { case Right(x) => x }.flatMap(_.mappingDef)
 
@@ -280,21 +282,21 @@ class BigQueryCaseClassGenerator(
 
     val classToRowMatcher = overwriteClassToRow orElse defaultClassToRow
 
-    val defultFunctorToRow: PartialFunction[(StandardSQLTypeName, String), String] = {
-      case (INT64, fn)     => s"x.$fn"
-      case (NUMERIC, fn)   => s"x.$fn"
-      case (FLOAT64, fn)   => s"x.$fn"
-      case (BOOL, fn)      => s"x.$fn"
-      case (STRING, fn)    => s"x.$fn"
+    val defaultFunctorToRow: PartialFunction[(StandardSQLTypeName, String), String] = {
+      case (INT64, fn)     => s"""x.$fn.map(y => Long.valueOf(y))"""
+      case (NUMERIC, fn)   => s"""x.$fn"""
+      case (FLOAT64, fn)   => s"""x.$fn.map(y => Double.valueOf(y))"""
+      case (BOOL, fn)      => s"""x.$fn.map(y => Boolean.valueOf(y))"""
+      case (STRING, fn)    => s"""x.$fn"""
       case (BYTES, fn)     => s"x.$fn.map(Base64.getEncoder.encodeToString)"
       case (DATE, fn)      => s"x.$fn.map(_.format(DateTimeFormatter.ISO_LOCAL_DATE))"
       case (DATETIME, fn)  => s"x.$fn.map(_.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))"
       case (TIME, fn)      => s"x.$fn.map(_.format(DateTimeFormatter.ISO_LOCAL_TIME))"
-      case (TIMESTAMP, fn) => s"x.$fn.map(_.toInstant.getEpochSecond)"
+      case (TIMESTAMP, fn) => s"x.$fn.map(_.toInstant.getEpochSecond).map(y => Long.valueOf(y))"
       case x               => throw new UnsupportedOperationException(s"$x field not supported")
     }
 
-    val functorToRowMatcher = overwriteFunctorToRow orElse defultFunctorToRow
+    val functorToRowMatcher = overwriteFunctorToRow orElse defaultFunctorToRow
 
     // column mapping
     val mappingFunc =
@@ -306,7 +308,7 @@ class BigQueryCaseClassGenerator(
 
       }
 
-    val thisMapPair = s""""$bqFieldName" -> $mappingFunc"""
+    val thisMapPair = s"""put("$bqFieldName", $mappingFunc)"""
 
     FieldInfo(thisField, thisMapPair)
   }
